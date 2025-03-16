@@ -11,46 +11,57 @@ import kotlin.math.max
 import kotlin.math.min
 
 class CardHolderNameFilter(visionText: Text, scannerOptions: CardScannerOptions, private val cardNumberScanResult: CardNumberScanResult) : ScanFilter(visionText, scannerOptions) {
-  private val cardHolderRegex: Regex = Regex(CardScannerRegexps.cardHolderName, RegexOption.MULTILINE)
-  val _maxBlocksBelowCardNumberToSearchForName = 4;
+  private val cardHolderRegex: Regex = Regex("[A-Za-z\\s]+", RegexOption.MULTILINE) // Updated regex to match names with spaces
+  val _maxBlocksBelowCardNumberToSearchForName = 4
 
   override fun filter(): CardHolderNameScanResult? {
-    if (!scannerOptions.scanCardHolderName) return null;
-    if (cardNumberScanResult.cardNumber.isEmpty()) return null;
+    if (!scannerOptions.scanCardHolderName) return null
+    if (cardNumberScanResult.cardNumber.isEmpty()) return null
 
-    ///Search from card number block and below [_maxBlocksBelowCardNumberToSearchForName] blocks
+    // Log the vision text to see what OCR output we're working with
+    Log.d("CardHolderNameFilter", "Vision Text: ${visionText.textBlocks.joinToString("\n") { it.text }}")
+
+    // Search from card number block and below [_maxBlocksBelowCardNumberToSearchForName] blocks
     val minTextBlockIndexToSearchName = max(cardNumberScanResult.textBlockIndex -
             (if (scannerOptions.possibleCardHolderNamePositions.contains(CardHolderNameScanPositions.aboveCardNumber.value)) 1 else 0), 0)
     val maxTextBlockIndexToSearchName =
             min(cardNumberScanResult.textBlockIndex +
-                    (if (scannerOptions.possibleCardHolderNamePositions.contains((CardHolderNameScanPositions.belowCardNumber.value))) _maxBlocksBelowCardNumberToSearchForName else 0), visionText.textBlocks.size - 1);
+                    (if (scannerOptions.possibleCardHolderNamePositions.contains((CardHolderNameScanPositions.belowCardNumber.value))) _maxBlocksBelowCardNumberToSearchForName else 0), visionText.textBlocks.size - 1)
+
+    // Log the block range to ensure we're scanning the right range
+    Log.d("CardHolderNameFilter", "Searching between blocks: $minTextBlockIndexToSearchName to $maxTextBlockIndexToSearchName")
 
     for (index in minTextBlockIndexToSearchName..maxTextBlockIndexToSearchName) {
       val block = visionText.textBlocks[index]
       val transformedBlockText = transformBlockText(block.text)
-      if (!cardHolderRegex.containsMatchIn(transformedBlockText)) continue;
+
+      if (!cardHolderRegex.containsMatchIn(transformedBlockText)) continue
       val cardHolderName = cardHolderRegex.find(transformedBlockText)!!.value.trim()
+
+      // Log the cardholder name for debugging
+      Log.d("CardHolderNameFilter", "Found potential cardholder name: '$cardHolderName'")
+
       if (isValidName(cardHolderName)) {
         return CardHolderNameScanResult(
-                textBlockIndex = index, textBlock = block, cardHolderName = cardHolderName, visionText = visionText);
+                textBlockIndex = index, textBlock = block, cardHolderName = cardHolderName, visionText = visionText)
       }
     }
-    return null;
+    return null
   }
 
   private fun isValidName(cardHolder: String): Boolean {
     if (cardHolder.length < 3 || cardHolder.length > scannerOptions.maxCardHolderNameLength) {
-      debugLog("maxCardHolderName length = " + scannerOptions.maxCardHolderNameLength, scannerOptions);
+      debugLog("maxCardHolderName length = " + scannerOptions.maxCardHolderNameLength, scannerOptions)
       return false
-    };
-    if (cardHolder.startsWith("valid from") || cardHolder.startsWith("valid thru")) return false;
-    if (cardHolder.endsWith("valid from") || cardHolder.endsWith("valid thru")) return false;
+    }
+    if (cardHolder.startsWith("valid from") || cardHolder.startsWith("valid thru")) return false
+    if (cardHolder.endsWith("valid from") || cardHolder.endsWith("valid thru")) return false
     if (CardHolderNameConstants.defaultBlackListedWords
                     .union(scannerOptions.cardHolderNameBlackListedWords.toSet())
                     .contains(cardHolder.toLowerCase(Locale.ENGLISH))) {
-      return false;
+      return false
     }
-    return true;
+    return true
   }
 
   private fun transformBlockText(blockText: String): String {
