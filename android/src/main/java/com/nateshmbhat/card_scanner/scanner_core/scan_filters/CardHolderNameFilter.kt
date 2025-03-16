@@ -49,20 +49,25 @@ class CardHolderNameFilter(visionText: Text, scannerOptions: CardScannerOptions,
     return null
   }
 
-  private fun isValidName(cardHolder: String): Boolean {
+private fun isValidName(cardHolder: String): Boolean {
     if (cardHolder.length < 3 || cardHolder.length > scannerOptions.maxCardHolderNameLength) {
-      debugLog("maxCardHolderName length = " + scannerOptions.maxCardHolderNameLength, scannerOptions)
-      return false
+        debugLog("maxCardHolderName length = " + scannerOptions.maxCardHolderNameLength, scannerOptions)
+        return false
     }
     if (cardHolder.startsWith("valid from") || cardHolder.startsWith("valid thru")) return false
     if (cardHolder.endsWith("valid from") || cardHolder.endsWith("valid thru")) return false
+
+    // Exclude names that are too long or contain common bank-related words
+    val excludedWords = setOf("bank", "finance", "microfinance", "islamic", "credit", "debit")
+    if (excludedWords.any { cardHolder.contains(it, ignoreCase = true) }) return false
+
     if (CardHolderNameConstants.defaultBlackListedWords
                     .union(scannerOptions.cardHolderNameBlackListedWords.toSet())
                     .contains(cardHolder.toLowerCase(Locale.ENGLISH))) {
-      return false
+        return false
     }
     return true
-  }
+}
 
   private fun transformBlockText(blockText: String): String {
     return blockText.replace('c', 'C')
