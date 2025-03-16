@@ -11,7 +11,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 class CardHolderNameFilter(visionText: Text, scannerOptions: CardScannerOptions, private val cardNumberScanResult: CardNumberScanResult) : ScanFilter(visionText, scannerOptions) {
-  private val cardHolderRegex: Regex = Regex("[A-Za-z\\s]+", RegexOption.MULTILINE) // Updated regex to match names with spaces
+  private val cardHolderRegex: Regex = Regex("[A-Z\\s]+", RegexOption.MULTILINE) // Updated regex to match names with spaces in all capitals
   val _maxBlocksBelowCardNumberToSearchForName = 4
 
   override fun filter(): CardHolderNameScanResult? {
@@ -49,7 +49,7 @@ class CardHolderNameFilter(visionText: Text, scannerOptions: CardScannerOptions,
     return null
   }
 
-private fun isValidName(cardHolder: String): Boolean {
+  private fun isValidName(cardHolder: String): Boolean {
     if (cardHolder.length < 3 || cardHolder.length > scannerOptions.maxCardHolderNameLength) {
         debugLog("maxCardHolderName length = " + scannerOptions.maxCardHolderNameLength, scannerOptions)
         return false
@@ -66,8 +66,15 @@ private fun isValidName(cardHolder: String): Boolean {
                     .contains(cardHolder.toLowerCase(Locale.ENGLISH))) {
         return false
     }
-    return true
-}
+
+    // Check if the name is in all capitals, second word is one letter, and has three words
+    val words = cardHolder.split(" ")
+    if (words.size == 3 && words.all { it == it.toUpperCase() } && words[1].length == 1) {
+        return true
+    }
+
+    return false
+  }
 
   private fun transformBlockText(blockText: String): String {
     return blockText.replace('c', 'C')
